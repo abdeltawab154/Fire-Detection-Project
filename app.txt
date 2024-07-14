@@ -1,0 +1,70 @@
+#include <ESP8266WiFi.h>
+#include <FirebaseESP8266.h>
+
+// Replace with your network credentials
+const char* ssid = "ROAA";
+const char* password = "mohamed@154";
+
+// Replace with your Firebase project credentials
+#define FIREBASE_HOST "naser-ba48a-default-rtdb.firebaseio.com"
+#define FIREBASE_AUTH "AIzaSyD1UhwP6cGWFZTAlt9LryLT75tnTdr4nGo"
+
+// Initialize Firebase
+FirebaseData firebaseData;
+
+// Define pin for controlling the motor water pump
+#define MOTOR_PUMP_PIN D0
+
+void setupWiFi() {
+    Serial.print("Connecting to ");
+    Serial.print(ssid);
+    Serial.println("...");
+    
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.print(".");
+    }
+    Serial.println("\nConnected to Wi-Fi!");
+    Serial.println("IP Address: ");
+    Serial.println(WiFi.localIP());
+}
+
+void setup() {
+    Serial.begin(115200);
+    
+    pinMode(MOTOR_PUMP_PIN, OUTPUT);
+    digitalWrite(MOTOR_PUMP_PIN, LOW);  // Ensure the motor pump is initially OFF
+    
+    setupWiFi();
+    
+    Firebase.begin(FIREBASE_HOST, FIREBASE_AUTH);
+    Firebase.reconnectWiFi(true);
+    
+    readMotorWaterPumpStatus();
+}
+
+void loop() {
+    readMotorWaterPumpStatus();
+    delay(5000); // Wait for 5 seconds before checking again
+}
+
+void readMotorWaterPumpStatus() {
+    if (Firebase.getInt(firebaseData, "/motor_water_pump")) {
+        if (firebaseData.dataType() == "int") {
+            int status = firebaseData.intData();
+            Serial.print("Motor Water Pump Status: ");
+            Serial.println(status);
+            if (status == 1) {
+                Serial.println("Fire detected! Motor water pump is ON.");
+                digitalWrite(MOTOR_PUMP_PIN, HIGH);  // Turn ON the motor pump
+            } else {
+                Serial.println("No fire detected. Motor water pump is OFF.");
+                digitalWrite(MOTOR_PUMP_PIN, LOW);  // Turn OFF the motor pump
+            }
+        }
+    } else {
+        Serial.print("Error getting data: ");
+        Serial.println(firebaseData.errorReason());
+    }
+}
